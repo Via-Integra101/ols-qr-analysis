@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OLS QR Decomposition - Interactive Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/ml-matrix@6.10.4/matrix.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header { 
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { font-size: 1.2em; opacity: 0.9; }
+        
+        .controls { 
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .control-group { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 5px;
+        }
+        .control-group label { 
+            font-weight: 600;
+            color: #495057;
+        }
+        .control-group input, select { 
+            padding: 8px 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .control-group input:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .analyze-btn { 
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .analyze-btn:hover { transform: translateY(-2px); }
+        .analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        
+        .results { 
+            padding: 30px;
+        }
+        .stats-grid { 
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card { 
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #3498db;
+            text-align: center;
+        }
+        .stat-value { 
+            font-size: 2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-label { 
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .plots-container { 
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .plot-box {
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .code-section {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+        .code-section h3 { 
+            color: #3498db;
+            margin-bottom: 15px;
+        }
+        
+        .loading { 
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+        .spinner { 
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .github-badge {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #2c3e50;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 14px;
+            z-index: 1000;
+        }
+        .github-badge:hover { background: #34495e; }
+    </style>
+</head>
+<body>
+    <a href="https://github.com/your-username/ols-qr-analysis" class="github-badge">⭐ Star on GitHub</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🔬 OLS QR Decomposition</h1>
+            <p>Interactive Scientific Computing Debug Tool</p>
+            <p><small>Pure JavaScript • No server required • Share anywhere</small></p>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="samples">Sample Size</label>
+                <input type="number" id="samples" value="100" min="50" max="1000">
+            </div>
+            <div class="control-group">
+                <label for="noise">Noise Level</label>
+                <input type="number" id="noise" value="0.5" min="0" max="2" step="0.1">
+            </div>
+            <div class="control-group">
+                <label for="seed">Random Seed</label>
+                <input type="number" id="seed" value="42" min="1" max="999">
+            </div>
+            <button class="analyze-btn" onclick="runAnalysis()">🚀 Run Analysis</button>
+        </div>
+        
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Running OLS QR Analysis...</p>
+        </div>
+        
+        <div class="results" id="results">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="r2-value">0.9391</div>
+                    <div class="stat-label">R-squared</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="rmse-value">0.4385</div>
+                    <div class="stat-label">RMSE</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="samples-value">100</div>
+                    <div class="stat-label">Samples</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="coef-count">3</div>
+                    <div class="stat-label">Coefficients</div>
+                </div>
+            </div>
+            
+            <div class="plots-container">
+                <div class="plot-box">
+                    <div id="actual-vs-predicted" style="height: 400px;"></div>
+                </div>
+                <div class="plot-box">
+                    <div id="residuals-plot" style="height: 400px;"></div>
+                </div>
+                <div class="plot-box">
+                    <div id="residual-hist" style="height: 400px;"></div>
+                </div>
+                <div class="plot-box">
+                    <div id="coefficients-plot" style="height: 400px;"></div>
+                </div>
+            </div>
+            
+            <div class="code-section">
+                <h3>📋 Algorithm Steps</h3>
+                <pre>1. X_ = addIntercept(X)           # Add intercept column
+2. [Q, R] = qrDecomposition(X_)   # QR decomposition  
+3. beta = solve(R, Q.T * y)       # Solve triangular system
+4. y_hat = X_ * beta              # Generate predictions
+5. r2 = 1 - SS_res/SS_tot         # Calculate R²</pre>
+            </div>
+            
+            <div class="code-section">
+                <h3>🎯 Results</h3>
+                <pre id="results-text">Ready! Click "Run Analysis" to see results...</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Seeded random number generator
+        class SeededRandom {
+            constructor(seed) {
+                this.seed = seed;
+            }
+            
+            next() {
+                this.seed = (this.seed * 9301 + 49297) % 233280;
+                return this.seed / 233280;
+            }
+            
+            normal() {
+                // Box-Muller transform
+                if (this.spare !== undefined) {
+                    const val = this.spare;
+                    this.spare = undefined;
+                    return val;
+                }
+                
+                const u = this.next();
+                const v = this.next();
+                const mag = 0.5 * Math.log(u);
+                const norm = Math.sqrt(-2 * mag);
+                
+                this.spare = norm * Math.cos(2 * Math.PI * v);
+                return norm * Math.sin(2 * Math.PI * v);
+            }
+        }
+
+        // Matrix operations using ml-matrix
+        function addIntercept(X) {
+            const n = X.length;
+            const result = new Array(n);
+            for (let i = 0; i < n; i++) {
+                result[i] = [1, ...X[i]];
+            }
+            return result;
+        }
+
+        function qrDecomposition(matrix) {
+            const M = new ML.Matrix(matrix);
+            const qr = new ML.QrDecomposition(M);
+            return {
+                Q: qr.orthogonalMatrix.to2DArray(),
+                R: qr.upperTriangularMatrix.to2DArray()
+            };
+        }
+
+        function matrixMultiply(A, B) {
+            const MA = new ML.Matrix(A);
+            const MB = new ML.Matrix(B);
+            return MA.mmul(MB).to2DArray();
+        }
+
+        function transpose(matrix) {
+            return new ML.Matrix(matrix).transpose().to2DArray();
+        }
+
+        function solveTriangular(R, b) {
+            const n = R.length;
+            const x = new Array(n);
+            
+            // Back substitution
+            for (let i = n - 1; i >= 0; i--) {
+                x[i] = b[i];
+                for (let j = i + 1; j < n; j++) {
+                    x[i] -= R[i][j] * x[j];
+                }
+                x[i] /= R[i][i];
+            }
+            return x;
+        }
+
+        function olsQR(X, y) {
+            // Add intercept
+            const X_ = addIntercept(X);
+            
+            // QR decomposition
+            const { Q, R } = qrDecomposition(X_);
+            
+            // Solve R * beta = Q^T * y
+            const Qt = transpose(Q);
+            const Qty = matrixMultiply(Qt, y.map(val => [val])).map(row => row[0]);
+            const beta = solveTriangular(R, Qty);
+            
+            // Predictions
+            const y_hat = matrixMultiply(X_, beta.map(val => [val])).map(row => row[0]);
+            
+            // R-squared
+            const yMean = y.reduce((sum, val) => sum + val, 0) / y.length;
+            const ssRes = y.reduce((sum, val, i) => sum + Math.pow(val - y_hat[i], 2), 0);
+            const ssTot = y.reduce((sum, val) => sum + Math.pow(val - yMean, 2), 0);
+            const r2 = 1 - (ssRes / ssTot);
+            
+            return { beta, y_hat, r2 };
+        }
+
+        function generateData(n, noise, seed) {
+            const rng = new SeededRandom(seed);
+            
+            // Generate X with correlation
+            const X = new Array(n);
+            for (let i = 0; i < n; i++) {
+                const x1 = rng.normal();
+                const x2 = 0.8 * x1 + 0.6 * rng.normal();
+                X[i] = [x1, x2];
+            }
+            
+            // True coefficients
+            const trueBeta = [2.0, 3.0, -1.5];
+            
+            // Generate y
+            const y = new Array(n);
+            for (let i = 0; i < n; i++) {
+                const yTrue = trueBeta[0] + trueBeta[1] * X[i][0] + trueBeta[2] * X[i][1];
+                y[i] = yTrue + noise * rng.normal();
+            }
+            
+            return { X, y, trueBeta };
+        }
+
+        function createPlots(X, y, y_hat, beta, r2) {
+            const residuals = y.map((val, i) => val - y_hat[i]);
+            
+            // Actual vs Predicted
+            Plotly.newPlot('actual-vs-predicted', [{
+                x: y,
+                y: y_hat,
+                mode: 'markers',
+                type: 'scatter',
+                name: 'Data',
+                marker: { color: 'blue', size: 6, opacity: 0.6 }
+            }, {
+                x: [Math.min(...y), Math.max(...y)],
+                y: [Math.min(...y), Math.max(...y)],
+                mode: 'lines',
+                type: 'scatter',
+                name: 'Perfect Fit',
+                line: { color: 'red', dash: 'dash' }
+            }], {
+                title: `Actual vs Predicted (R² = ${r2.toFixed(4)})`,
+                xaxis: { title: 'Actual y' },
+                yaxis: { title: 'Predicted y' },
+                showlegend: true
+            }, { responsive: true });
+
+            // Residuals vs Predicted
+            Plotly.newPlot('residuals-plot', [{
+                x: y_hat,
+                y: residuals,
+                mode: 'markers',
+                type: 'scatter',
+                name: 'Residuals',
+                marker: { color: 'green', size: 6, opacity: 0.6 }
+            }, {
+                x: [Math.min(...y_hat), Math.max(...y_hat)],
+                y: [0, 0],
+                mode: 'lines',
+                type: 'scatter',
+                name: 'Zero Line',
+                line: { color: 'red', dash: 'dash' }
+            }], {
+                title: 'Residuals vs Predicted',
+                xaxis: { title: 'Predicted y' },
+                yaxis: { title: 'Residuals' },
+                showlegend: true
+            }, { responsive: true });
+
+            // Residual histogram
+            Plotly.newPlot('residual-hist', [{
+                x: residuals,
+                type: 'histogram',
+                nbinsx: 15,
+                name: 'Residuals',
+                marker: { color: 'orange', opacity: 0.7 }
+            }], {
+                title: 'Residual Distribution',
+                xaxis: { title: 'Residuals' },
+                yaxis: { title: 'Frequency' },
+                showlegend: false
+            }, { responsive: true });
+
+            // Coefficients
+            const coefNames = ['Intercept', 'β₁', 'β₂'];
+            Plotly.newPlot('coefficients-plot', [{
+                x: coefNames,
+                y: beta,
+                type: 'bar',
+                name: 'Coefficients',
+                marker: { color: ['skyblue', 'lightgreen', 'lightcoral'] },
+                text: beta.map(val => val.toFixed(3)),
+                textposition: 'auto'
+            }], {
+                title: 'Estimated Coefficients',
+                xaxis: { title: 'Coefficients' },
+                yaxis: { title: 'Value' },
+                showlegend: false
+            }, { responsive: true });
+        }
+
+        async function runAnalysis() {
+            const samples = parseInt(document.getElementById('samples').value);
+            const noise = parseFloat(document.getElementById('noise').value);
+            const seed = parseInt(document.getElementById('seed').value);
+            
+            const btn = document.querySelector('.analyze-btn');
+            const loading = document.querySelector('.loading');
+            const results = document.getElementById('results');
+            
+            // Show loading
+            btn.disabled = true;
+            btn.textContent = '⏳ Analyzing...';
+            loading.style.display = 'block';
+            
+            // Small delay for UI update
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            try {
+                // Generate data and run analysis
+                const { X, y, trueBeta } = generateData(samples, noise, seed);
+                const { beta, y_hat, r2 } = olsQR(X, y);
+                
+                const rmse = Math.sqrt(y.reduce((sum, val, i) => sum + Math.pow(val - y_hat[i], 2), 0) / y.length);
+                
+                // Update stats
+                document.getElementById('r2-value').textContent = r2.toFixed(4);
+                document.getElementById('rmse-value').textContent = rmse.toFixed(4);
+                document.getElementById('samples-value').textContent = samples;
+                
+                // Create plots
+                createPlots(X, y, y_hat, beta, r2);
+                
+                // Update results text
+                const resultsText = `Estimated Coefficients:
+  Intercept: ${beta[0].toFixed(4)} (true: ${trueBeta[0].toFixed(1)})
+  β₁:        ${beta[1].toFixed(4)} (true: ${trueBeta[1].toFixed(1)})
+  β₂:        ${beta[2].toFixed(4)} (true: ${trueBeta[2].toFixed(1)})
+
+Model Performance:
+  R²:   ${r2.toFixed(6)}
+  RMSE: ${rmse.toFixed(4)}
+  
+Algorithm: QR Decomposition (numerically stable)
+Status: ✅ Analysis complete
+Seed: ${seed} (reproducible results)`;
+                
+                document.getElementById('results-text').textContent = resultsText;
+                results.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                document.getElementById('results-text').textContent = 'Error: ' + error.message;
+            } finally {
+                // Reset button
+                btn.disabled = false;
+                btn.textContent = '🚀 Run Analysis';
+                loading.style.display = 'none';
+            }
+        }
+
+        // Run initial analysis when page loads
+        window.onload = () => {
+            setTimeout(runAnalysis, 500);
+        };
+    </script>
+</body>
+</html>
