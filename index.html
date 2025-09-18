@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OLS QR Decomposition - Interactive Analysis</title>
-    <script src="https://cdn.jsdelivr.net/npm/ml-matrix@6.10.4/matrix.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -164,7 +163,7 @@
         <div class="header">
             <h1>🔬 OLS QR Decomposition</h1>
             <p>Interactive Scientific Computing Debug Tool</p>
-            <p><small>Pure JavaScript • No server required • Share anywhere</small></p>
+            <p><small>Pure JavaScript • No dependencies • Share anywhere</small></p>
         </div>
         
         <div class="controls">
@@ -269,7 +268,7 @@
             }
         }
 
-        // Matrix operations using ml-matrix
+        // Pure JavaScript matrix operations (no external dependencies)
         function addIntercept(X) {
             const n = X.length;
             const result = new Array(n);
@@ -279,23 +278,90 @@
             return result;
         }
 
-        function qrDecomposition(matrix) {
-            const M = new ML.Matrix(matrix);
-            const qr = new ML.QrDecomposition(M);
-            return {
-                Q: qr.orthogonalMatrix.to2DArray(),
-                R: qr.upperTriangularMatrix.to2DArray()
-            };
-        }
-
         function matrixMultiply(A, B) {
-            const MA = new ML.Matrix(A);
-            const MB = new ML.Matrix(B);
-            return MA.mmul(MB).to2DArray();
+            const aRows = A.length;
+            const aCols = A[0].length;
+            const bCols = B[0].length;
+            const result = new Array(aRows);
+            
+            for (let i = 0; i < aRows; i++) {
+                result[i] = new Array(bCols);
+                for (let j = 0; j < bCols; j++) {
+                    result[i][j] = 0;
+                    for (let k = 0; k < aCols; k++) {
+                        result[i][j] += A[i][k] * B[k][j];
+                    }
+                }
+            }
+            return result;
         }
 
         function transpose(matrix) {
-            return new ML.Matrix(matrix).transpose().to2DArray();
+            const rows = matrix.length;
+            const cols = matrix[0].length;
+            const result = new Array(cols);
+            
+            for (let i = 0; i < cols; i++) {
+                result[i] = new Array(rows);
+                for (let j = 0; j < rows; j++) {
+                    result[i][j] = matrix[j][i];
+                }
+            }
+            return result;
+        }
+
+        function qrDecomposition(matrix) {
+            const m = matrix.length;
+            const n = matrix[0].length;
+            
+            // Copy input matrix
+            const A = matrix.map(row => [...row]);
+            const Q = new Array(m);
+            for (let i = 0; i < m; i++) {
+                Q[i] = new Array(n).fill(0);
+            }
+            const R = new Array(n);
+            for (let i = 0; i < n; i++) {
+                R[i] = new Array(n).fill(0);
+            }
+            
+            // Gram-Schmidt process
+            for (let j = 0; j < n; j++) {
+                // Get column j from A
+                let v = new Array(m);
+                for (let i = 0; i < m; i++) {
+                    v[i] = A[i][j];
+                }
+                
+                // Orthogonalize against previous columns
+                for (let i = 0; i < j; i++) {
+                    let dot = 0;
+                    for (let k = 0; k < m; k++) {
+                        dot += Q[k][i] * v[k];
+                    }
+                    R[i][j] = dot;
+                    
+                    for (let k = 0; k < m; k++) {
+                        v[k] -= dot * Q[k][i];
+                    }
+                }
+                
+                // Normalize
+                let norm = 0;
+                for (let i = 0; i < m; i++) {
+                    norm += v[i] * v[i];
+                }
+                norm = Math.sqrt(norm);
+                R[j][j] = norm;
+                
+                if (norm > 1e-12) {
+                    for (let i = 0; i < m; i++) {
+                        Q[i][j] = v[i] / norm;
+                    }
+                }
+            }
+            
+            return { Q, R };
         }
 
         function solveTriangular(R, b) {
