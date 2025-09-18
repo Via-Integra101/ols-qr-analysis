@@ -17,7 +17,7 @@
 
 ## 🎮 Try It Live
 
-**👉 [Open Interactive Demo](https://your-username.github.io/ols-qr-analysis)**
+**👉 [Open Interactive Demo]([https://your-username.github.io/ols-qr-analysis](https://via-integra101.github.io/ols-qr-analysis/))**
 
 ## 🚀 Deploy Your Own (2 minutes)
 
