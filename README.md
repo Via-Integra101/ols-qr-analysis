@@ -74,3 +74,9 @@ Fork and modify for your own algorithms:
 ---
 
 **No installation, no setup, just share the URL! 🎉**
+
+## 🛠 Built With
+
+**✨ Created with [Flowpad.ai](https://flowpad.ai)** - AI-powered development environment for rapid prototyping and interactive coding.
+
+Perfect for scientific computing workflows - from exploration to production debugging tools!
